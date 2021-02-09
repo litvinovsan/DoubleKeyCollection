@@ -1,6 +1,7 @@
 ﻿using UCollection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 using System.Threading;
@@ -11,56 +12,53 @@ namespace UCollection.Tests
     public class DoubleKeyCollectionTests
     {
         #region /// Initialization
-        public class Person
+
+        private class Person
         {
             public int Id { get; set; }
             public string Name { get; }
-            private DateTime BirthDay { get; }
 
             public Person()
             {
                 Id = IdCnt++;
                 Name = Guid.NewGuid().ToString();
-                BirthDay = DateTime.Now;
             }
 
             public Person(int id, string name)
             {
                 Id = id;
                 Name = name;
-                BirthDay = DateTime.UtcNow;
             }
 
             public static int IdCnt = 0;
         }
 
-        public DoubleKeyCollection<int, string, Person> TestCollection;
+        private DoubleKeyCollection<int, string, Person> _testCollection;
 
-        public Person Person1;
-        public Person Person2;
-        public Person Person3;
+        private Person _person1;
+        private Person _person2;
+        private Person _person3;
 
         [TestInitialize]
         public void Setup()
         {
-            TestCollection = new DoubleKeyCollection<int, string, Person>();
+            _testCollection = new DoubleKeyCollection<int, string, Person>();
 
-            Person1 = new Person();
-            Person2 = new Person();
-            Person3 = new Person();
+            _person1 = new Person();
+            _person2 = new Person();
+            _person3 = new Person();
 
-            TestCollection.Add(Person1.Id, Person1.Name, Person1);
-            TestCollection.Add(Person2.Id, Person2.Name, Person2);
-            TestCollection.Add(Person3.Id, Person3.Name, Person3);
+            _testCollection.Add(_person1.Id, _person1.Name, _person1);
+            _testCollection.Add(_person2.Id, _person2.Name, _person2);
+            _testCollection.Add(_person3.Id, _person3.Name, _person3);
         }
 
         [TestCleanup]
         public void Clean()
         {
-            TestCollection.Clear();
+            _testCollection.Clear();
             Person.IdCnt = 0;
         }
-
 
         [TestMethod()]
         public void ClearTest()
@@ -69,16 +67,16 @@ namespace UCollection.Tests
 
             //Action
             var p = new Person();
-            TestCollection.Add(p.Id, p.Name, p);
-            TestCollection.Clear();
-            var actual = TestCollection.Count;
+            _testCollection.Add(p.Id, p.Name, p);
+            _testCollection.Clear();
+            var actual = _testCollection.Count;
 
             //Assert
             Assert.AreEqual(expected, actual);
         }
         #endregion
 
-        #region /// Add Values Tests
+        #region /// Add and Remove Tests
 
         #region /// "Add" Method
         [TestMethod()]
@@ -108,13 +106,13 @@ namespace UCollection.Tests
 
             int testId = 1;
             string testName = Guid.NewGuid().ToString();
-            var Val = DateTime.Now;
+            var val = DateTime.Now;
 
             // act
-            collection.Add(testId, testName, Val);
-            collection.Add(testId, testName, Val);
+            collection.Add(testId, testName, val);
+            collection.Add(testId, testName, val);
             // assert
-            Assert.AreEqual(collection.Values.ToList()[0], Val);
+            Assert.AreEqual(collection.Values.ToList()[0], val);
         }
 
         [TestMethod()]
@@ -133,47 +131,122 @@ namespace UCollection.Tests
         public void Same_Id_Test()
         {
             //Arrange
-            var id = Person1.Id;
+            var id = _person1.Id;
             var p1 = new Person() { Id = id };
             var p2 = new Person() { Id = id };
             var p3 = new Person() { Id = id };
 
             //Action
-            TestCollection.Add(p1.Id, p1.Name, p1);
-            TestCollection.Add(p2.Id, p2.Name, p2);
-            TestCollection.Add(p3.Id, p3.Name, p3);
+            _testCollection.Add(p1.Id, p1.Name, p1);
+            _testCollection.Add(p2.Id, p2.Name, p2);
+            _testCollection.Add(p3.Id, p3.Name, p3);
 
-            var expectedCnt = TestCollection.Keys.Where(x => x.Item1 .Equals(id)).Select(y => y).ToArray().Length;
-            var result = TestCollection[id].Length;
+            var expectedCnt = _testCollection.Keys.Where(x => x.Item1.Equals(id)).Select(y => y).ToArray().Length;
+            var result = _testCollection[id].Count();
             //Assert
             Assert.AreEqual(expectedCnt, result);
         }
 
+
+        [TestMethod()]
+        public void RemoveTest()
+        {
+            // Arrange 
+            var expectedId = _person2.Id;
+            var expectedName = _person2.Name;
+
+            // Action
+            var isContains = _testCollection.Contains(expectedId, expectedName);
+            Assert.IsTrue(isContains);
+
+            var result = _testCollection.Remove(expectedId, expectedName);
+            Assert.IsTrue(result);
+
+            isContains = _testCollection.Contains(expectedId, expectedName);
+            Assert.IsFalse(isContains);
+        }
+
+        [TestMethod()]
+        public void Remove_No_Key_Test()
+        {
+            // Arrange 
+            var expectedId = _person2.Id;
+            var expectedName = "dummy";
+
+            // Action
+            var isContains = _testCollection.Contains(expectedId, expectedName);
+            Assert.IsFalse(isContains);
+
+            var result = _testCollection.Remove(expectedId, expectedName);
+            Assert.IsFalse(result);
+
+            isContains = _testCollection.Contains(expectedId, expectedName);
+            Assert.IsFalse(isContains);
+        }
         #endregion
 
         #region /// Get Values Tests
 
         [TestMethod()]
+        public void Foreach_Test()
+        {
+            //Arrange
+            List<int> idListExpected = new List<int>() { _person1.Id, _person2.Id, _person3.Id };
+            List<string> nameListExpected = new List<string>() { _person1.Name, _person2.Name, _person3.Name };
+
+            //Action
+            List<int> idListResult = new List<int>();
+            List<string> nameListResult = new List<string>();
+            foreach (var entry in _testCollection)
+            {
+                idListResult.Add(entry.Id);
+                nameListResult.Add(entry.Name);
+            }
+            //Assert
+            Assert.IsTrue(idListExpected.Count == idListResult.Count);
+            Assert.IsTrue(nameListExpected.Count == nameListResult.Count);
+            Assert.IsTrue(idListExpected[1] == idListResult[1]);
+            Assert.IsTrue(nameListExpected[0] == nameListResult[0]);
+        }
+
+        [TestMethod()]
+        public void TryGetValueTest()
+        {
+            var person = new Person();
+            var result = _testCollection.TryGetValue(_person1.Id, _person1.Name, out person);
+            Assert.IsTrue(result);
+            Assert.AreEqual(person, _person1);
+        }
+
+        [TestMethod()]
+        public void TryGetValue_No_entry_Test()
+        {
+            var person = new Person();
+            var result = _testCollection.TryGetValue(person.Id, person.Name, out person);
+            Assert.IsFalse(result);
+        }
+
+        [TestMethod()]
         public void Get_Value_by_Full_Key_Test()
         {
             //Arrange
-            var id = Person1.Id;
-            var name = Person1.Name;
+            var id = _person1.Id;
+            var name = _person1.Name;
 
             //Action
-            var result = TestCollection[id, name];
+            var result = _testCollection[id, name];
             //Assert
-            Assert.AreEqual(Person1, result);
+            Assert.AreEqual(_person1, result);
         }
 
         [TestMethod()]
         public void Key_NotFoundException_Test()
         {
             //Arrange
-            var id = Person1.Id;
+            var id = _person1.Id;
 
             //Assert
-            Assert.ThrowsException<DoubleKeyCollection<int, string, Person>.KeyNotExistsException>(() => TestCollection[id, "Dummy"]);
+            Assert.ThrowsException<DoubleKeyCollection<int, string, Person>.KeyNotExistsException>(() => _testCollection[id, "Dummy"]);
         }
 
         [TestMethod()]
@@ -187,9 +260,9 @@ namespace UCollection.Tests
             dcCollection.Add(75, 4, new Person());
 
             var resultId = dcCollection[id: 75];
-            Assert.AreEqual(2, resultId.Length);
+            Assert.AreEqual(2, resultId.Count());
             var resultName = dcCollection[name: 75];
-            Assert.AreEqual(1, resultName.Length);
+            Assert.AreEqual(1, resultName.Count());
         }
 
         [TestMethod()]
@@ -198,15 +271,56 @@ namespace UCollection.Tests
             // Arrange
             var expectedPerson = new Person();
             var notExpectedPerson = new Person();
-            TestCollection.Add(expectedPerson.Id, expectedPerson.Name, expectedPerson);
+            _testCollection.Add(expectedPerson.Id, expectedPerson.Name, expectedPerson);
 
             // Action
-            var result = TestCollection.Contains(expectedPerson);
-            var resultNotExpected = TestCollection.Contains(notExpectedPerson);
+            var result = _testCollection.Contains(expectedPerson);
+            var resultNotExpected = _testCollection.Contains(notExpectedPerson);
 
             // Assert
             Assert.IsTrue(result);
             Assert.IsFalse(resultNotExpected);
+        }
+
+        [TestMethod()]
+        public void Contains_Id_Name_Test()
+        {
+            // Arrange
+            var testPerson = new Person();
+            _testCollection.Add(testPerson.Id, testPerson.Name, testPerson);
+
+            // Actions
+            var actual = _testCollection.Contains(testPerson.Id, testPerson.Name);
+            _testCollection.Contains(testPerson);
+
+            // Assert
+            Assert.IsTrue(_testCollection.Contains(testPerson));
+            Assert.IsTrue(actual);
+        }
+
+        [TestMethod()]
+        public void Contains_Id_Test()
+        {
+            // Arrange 
+            var expId = _person1.Id;
+
+            // Action
+            var result = _testCollection.Contains(expId);
+            // Assert
+            Assert.IsTrue(result);
+        }
+
+        [TestMethod()]
+        public void Contains_Name_Test()
+        {
+            // Arrange 
+            var expName = _person1.Name;
+
+            // Action
+            var result = _testCollection.Contains(expName);
+            // Assert
+            Assert.IsTrue(result);
+            Assert.IsFalse(_testCollection.Contains("Dummy"));
         }
 
         #endregion
@@ -221,32 +335,32 @@ namespace UCollection.Tests
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                TestCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Name, person);
             }
 
             var expectedPerson = new Person();
             var id = expectedPerson.Id;
             var name = expectedPerson.Name;
 
-            TestCollection.Add(expectedPerson.Id, expectedPerson.Name, expectedPerson);
+            _testCollection.Add(expectedPerson.Id, expectedPerson.Name, expectedPerson);
 
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                TestCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Name, person);
             }
 
             //Action
             stopWatch.Start();
-            var result = TestCollection[id, name];
+            var result = _testCollection[id, name];
             stopWatch.Stop();
 
-            var time = stopWatch.Elapsed.TotalMilliseconds; // Key Value TotalMilliseconds = 0.6987
-                                                            // Key Struct time=1.0098  
-                                                           // Key Struct std   1.192
-                                                           // ValueTuple 0.98
-                                                           // Tuple 0.46
-            //Assert
+            var unused = stopWatch.Elapsed.TotalMilliseconds; // Key Value TotalMilliseconds = 0.6987
+                                                              // Key Struct time=1.0098  
+                                                              // Key Struct std   1.192
+                                                              // ValueTuple 0.98
+                                                              // Tuple 0.46
+                                                              //Assert
             Assert.AreEqual(expectedPerson, result);
         }
 
@@ -260,7 +374,7 @@ namespace UCollection.Tests
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                TestCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Name, person);
             }
 
             var expectedPerson = new Person();
@@ -270,36 +384,36 @@ namespace UCollection.Tests
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                TestCollection.Add(expectedPersonId, p.Name, p);
+                _testCollection.Add(expectedPersonId, p.Name, p);
             }
 
             // Init random entries
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                TestCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Name, person);
             }
 
             // Init Expected values
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                TestCollection.Add(expectedPersonId, p.Name, p);
+                _testCollection.Add(expectedPersonId, p.Name, p);
             }
 
             //Action
             stopWatch.Start();
-            var result = TestCollection[expectedPersonId];
-            var actualdLength = result.Length;
+            var result = _testCollection[expectedPersonId];
+            var actualdLength = result.Count();
 
             stopWatch.Stop();
 
-            var time = stopWatch.Elapsed.TotalMilliseconds; // Key Value         92.66
-                                                            // Key Struct time   84.4   
-                                                            // Key Struct std    20.3
-                                                            // ValueTuple 98.9
-                                                            // Tuple      33.8
-            //Assert
+            var unused = stopWatch.Elapsed.TotalMilliseconds; // Key Value         92.66
+                                                              // Key Struct time   84.4   
+                                                              // Key Struct std    20.3
+                                                              // ValueTuple 98.9
+                                                              // Tuple      33.8
+                                                              //Assert
             Assert.AreEqual(30, actualdLength);
         }
 
@@ -313,7 +427,7 @@ namespace UCollection.Tests
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                TestCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Name, person);
             }
 
             var expectedPerson = new Person();
@@ -323,43 +437,43 @@ namespace UCollection.Tests
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                TestCollection.Add(p.Id, expectedName, p);
+                _testCollection.Add(p.Id, expectedName, p);
             }
 
             // Init random entries
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                TestCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Name, person);
             }
 
             // Init Expected values
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                TestCollection.Add(p.Id, expectedName, p);
+                _testCollection.Add(p.Id, expectedName, p);
             }
 
             //Action
             stopWatch.Start();
-            var result = TestCollection[expectedName];
-            var actualdLength = result.Length;
+            var result = _testCollection[expectedName];
+            var actualdLength = result.Count();
 
             stopWatch.Stop();
 
-            var time = stopWatch.Elapsed.TotalMilliseconds; // Key Value 21.032 
-                                                            // Key Struct 27.6
-                                                            // KeyStruct std 17
-                                                            // ValueTuple 33
-                                                            // Tuple 13
-            //Assert
+            var unused = stopWatch.Elapsed.TotalMilliseconds; // Key Value 21.032 
+                                                              // Key Struct 27.6
+                                                              // KeyStruct std 17
+                                                              // ValueTuple 33
+                                                              // Tuple 13
+                                                              //Assert
             Assert.AreEqual(30, actualdLength);
         }
 
         #region ReferenceType Id and Name
         class TestKeyName
         {
-            public string Name { get; set; }
+            private string Name { get; set; }
 
             public TestKeyName()
             {
@@ -418,7 +532,7 @@ namespace UCollection.Tests
             //Action
             stopWatch.Start();
             var result = collection[expectedName];
-            var actualdLength = result.Length;
+            var actualdLength = result.Count();
 
             stopWatch.Stop();
 
@@ -427,21 +541,11 @@ namespace UCollection.Tests
                                                             // Key Struct std 26.0053   
                                                             // ValueTuple 24.7
                                                             // Tuple 14
-            //Assert
+                                                            //Assert
             Assert.AreEqual(30, actualdLength);
         }
         #endregion
+
         #endregion
-
-
-
-
-        [TestMethod()]
-        public void RemoveTest()
-        {
-            Assert.Fail();
-        }
-       
-      
     }
 }

@@ -14,13 +14,10 @@ namespace UCollection
         {
             DoubleKeyCollection<int, string, string> ucCollection =new DoubleKeyCollection<int,string,string>();
 
-            ucCollection.Add(1, "", "");
-
-         //   ucCollection.Add(1, "", "");
-
-            Dictionary<int,string> s=new Dictionary<int, string>();
-            s.Add(1,"asas");
-            var a = s[5];
+            foreach (var item in ucCollection)
+            {
+            }
+            
 
         }
     }

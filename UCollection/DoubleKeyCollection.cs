@@ -2,75 +2,47 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace UCollection
 {
-    /*
-     *public IEnumerator<T> GetEnumerator() 
-	{
-		foreach(var v in arr) yield return v;
-	}
-     *
-     * System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() 
-	{
-		return GetEnumerator();
-	}
-     *
-     * class A<T>: IEnumerable<T>
-     //*/
-    public class DoubleKeyCollection<TId, TName, TValue> : ICollection// : IEnumerable<KeyValuePair<TId, TName>, TValue>    IQueryable<T>
+    public class DoubleKeyCollection<TId, TName, TValue> : IEnumerable<DoubleKeyCollection<TId, TName, TValue>.KeyValueStruct>
     {
         #region /// Propetries
 
         private readonly Dictionary<Tuple<TId, TName>, TValue> _dictionary = new Dictionary<Tuple<TId, TName>, TValue>();
-
-        private readonly Dictionary<TId, Dictionary<TName, TValue>> _dictionary2 = new Dictionary<TId, Dictionary<TName, TValue>>();
-
-
         public Dictionary<Tuple<TId, TName>, TValue>.KeyCollection Keys
         {
             get { return _dictionary.Keys; }
-        }
-        public TId[] KeysId
-        {
-            get { return _dictionary.Keys.Select(x => x.Item1).ToArray(); }
-        }
-        public TName[] KeysName
-        {
-            get { return _dictionary.Keys.Select(x => x.Item2).ToArray(); }
         }
         public Dictionary<Tuple<TId, TName>, TValue>.ValueCollection Values
         {
             get { return _dictionary.Values; }
         }
 
-        public void CopyTo(Array array, int index)
+        /// <summary>
+        ///  Collection of Id's
+        /// </summary>
+        public IEnumerable<TId> KeysId
         {
-           
+            get { return _dictionary.Keys.Select(x => x.Item1); }
         }
 
+        /// <summary>
+        ///  Collection of Names's
+        /// </summary>
+        public IEnumerable<TName> KeysName
+        {
+            get { return _dictionary.Keys.Select(x => x.Item2); }
+        }
+
+        ///  Total number of entries in collection
         public int Count
         {
             get { return _dictionary.Count; }
         }
-
-        public object SyncRoot { get; }
-        public bool IsSynchronized { get; }
-
-        #endregion
-
-        #region /// Constructor
-
-        public DoubleKeyCollection()
-        { }
-
-
-
-        #endregion
-
-        #region /// Events
 
         #endregion
 
@@ -88,7 +60,8 @@ namespace UCollection
             if (name == null) throw new ArgumentNullException(nameof(name));
             if (value == null) throw new ArgumentNullException(nameof(value));
 
-            if (!Keys.Contains(new Tuple<TId, TName>(id, name)))
+            var keyToAdd = new Tuple<TId, TName>(id, name);
+            if (!Keys.Contains(keyToAdd))
             {
                 _dictionary.Add(new Tuple<TId, TName>(id, name), value);
             }
@@ -99,11 +72,57 @@ namespace UCollection
         }
 
         /// <summary>
+        /// Remove Value by Id and Name keys
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="name"></param>
+        public bool Remove(TId id, TName name)
+        {
+            if (id == null) throw new ArgumentNullException(nameof(id));
+            if (name == null) throw new ArgumentNullException(nameof(name));
+
+            var result = false;
+
+            try
+            {
+                if (KeysId.Contains(id) && KeysName.Contains(name))
+                {
+                    var key = new Tuple<TId, TName>(id, name);
+                    if (Keys.Contains(key))
+                    {
+                        result = _dictionary.Remove(key);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                throw new DoubleKeyCollectionException("Remove operation Error. " + e.Message);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         ///  Clear Collection
         /// </summary>
         public void Clear()
         {
             _dictionary.Clear();
+        }
+
+        /// <summary>
+        /// Returns True in case of success getting value by Id and Name
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="name"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public bool TryGetValue(TId id, TName name, out TValue value)
+        {
+            if (id == null) throw new ArgumentNullException(nameof(id));
+            if (name == null) throw new ArgumentNullException(nameof(name));
+
+            return _dictionary.TryGetValue(new Tuple<TId, TName>(id, name), out value);
         }
 
         /// <summary>
@@ -116,6 +135,9 @@ namespace UCollection
         {
             get
             {
+                if (id == null) throw new ArgumentNullException(nameof(id));
+                if (name == null) throw new ArgumentNullException(nameof(name));
+
                 try
                 {
                     var result = _dictionary[new Tuple<TId, TName>(id, name)];
@@ -129,6 +151,8 @@ namespace UCollection
             }
             set
             {
+                if (id == null) throw new ArgumentNullException(nameof(id));
+                if (name == null) throw new ArgumentNullException(nameof(name));
                 try
                 {
                     _dictionary[new Tuple<TId, TName>(id, name)] = value;
@@ -145,14 +169,14 @@ namespace UCollection
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public KeyValuePair<Tuple<TId, TName>, TValue>[] this[TId id]
+        public IEnumerable<Tuple<TName, TValue>> this[TId id]
         {
             get
             {
+                if (id == null) throw new ArgumentNullException(nameof(id));
                 try
                 {
-                    var result = _dictionary.Where(x => x.Key.Item1.Equals(id)).ToArray();
-
+                    var result = _dictionary.Where(x => x.Key.Item1.Equals(id)).Select((z) => new Tuple<TName, TValue>(z.Key.Item2, z.Value));
                     return result;
                 }
                 catch (Exception e)
@@ -167,13 +191,14 @@ namespace UCollection
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
-        public KeyValuePair<Tuple<TId, TName>, TValue>[] this[TName name]
+        public IEnumerable<Tuple<TId, TValue>> this[TName name]
         {
             get
             {
+                if (name == null) throw new ArgumentNullException(nameof(name));
                 try
                 {
-                    var result = _dictionary.Where(x => x.Key.Item2.Equals(name)).ToArray();
+                    var result = _dictionary.Where(x => x.Key.Item2.Equals(name)).Select((z) => new Tuple<TId, TValue>(z.Key.Item1, z.Value));
 
                     return result;
                 }
@@ -182,6 +207,56 @@ namespace UCollection
                     throw new KeyNotExistsException($"Requested Key {name} - does not exist", e);
                 }
             }
+        }
+
+        /// <summary>
+        /// Returns True if the collection contains "value"
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public bool Contains(TValue value)
+        {
+            if (value == null) throw new ArgumentNullException(nameof(value));
+
+            return _dictionary.ContainsValue(value);
+        }
+
+        /// <summary>
+        /// Returns True if the collection contains uniq combination of Id and Name
+        /// </summary>
+        /// <param name="id">Key</param>
+        /// <param name="name">Key</param>
+        /// <returns></returns>
+        public bool Contains(TId id, TName name)
+        {
+            if (id == null) throw new ArgumentNullException(nameof(id));
+            if (name == null) throw new ArgumentNullException(nameof(name));
+
+            return _dictionary.ContainsKey(new Tuple<TId, TName>(id, name));
+        }
+
+        /// <summary>
+        /// Returns True if the collection contains Id key
+        /// </summary>
+        /// <param name="id">Key</param>
+        /// <returns></returns>
+        public bool Contains(TId id)
+        {
+            if (id == null) throw new ArgumentNullException(nameof(id));
+
+            return KeysId.Contains(id);
+        }
+
+        /// <summary>
+        /// Returns True if the collection contains Name key
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public bool Contains(TName name)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+
+            return KeysName.Contains(name);
         }
         #endregion
 
@@ -198,6 +273,16 @@ namespace UCollection
                 System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
         }
 
+        [Serializable]
+        public class DoubleKeyCollectionException : Exception
+        {
+            public DoubleKeyCollectionException() { }
+            public DoubleKeyCollectionException(string message) : base(message) { }
+            public DoubleKeyCollectionException(string message, Exception inner) : base(message, inner) { }
+            protected DoubleKeyCollectionException(
+                System.Runtime.Serialization.SerializationInfo info,
+                System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+        }
 
         [Serializable]
         public class KeyAlreadyExistsException : Exception
@@ -222,32 +307,34 @@ namespace UCollection
         }
         #endregion
 
-
-
-
-
-
-
-
-        public bool Contains(TValue value)
+        #region /// Implementation of interfaces
+        IEnumerator IEnumerable.GetEnumerator()
         {
-            if (value == null) throw new ArgumentNullException(nameof(value));
-
-            return _dictionary.ContainsValue(value);
+            return _dictionary.GetEnumerator();
         }
 
-
-
-        public void Remove(object key)
+        IEnumerator<KeyValueStruct> IEnumerable<KeyValueStruct>.GetEnumerator()
         {
-            throw new NotImplementedException();
+            foreach (var item in _dictionary)
+            {
+                yield return
+                    new KeyValueStruct()
+                    {
+                        Id = item.Key.Item1,
+                        Name = item.Key.Item2,
+                        Value = item.Value
+                    };
+            }
         }
 
-
-        public IEnumerator GetEnumerator()
+        public struct KeyValueStruct
         {
-            throw new NotImplementedException();
+            public TId Id;
+            public TName Name;
+            public TValue Value;
         }
+
+        #endregion
     }
 }
 
