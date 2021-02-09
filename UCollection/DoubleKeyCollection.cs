@@ -61,11 +61,14 @@ namespace UCollection
             if (value == null) throw new ArgumentNullException(nameof(value));
 
             var keyToAdd = new Tuple<TId, TName>(id, name);
-            if (!Keys.Contains(keyToAdd))
+
+            if (Keys.Contains(keyToAdd)) throw new KeyAlreadyExistsException($"Key: {id} - {name} already exists"); ;
+
+            try
             {
                 _dictionary.Add(new Tuple<TId, TName>(id, name), value);
             }
-            else
+            catch (Exception)
             {
                 throw new KeyAlreadyExistsException($"Key: {id} - {name} already exists");
             }
@@ -83,15 +86,14 @@ namespace UCollection
 
             var result = false;
 
+            if (!KeysId.Contains(id) || !KeysName.Contains(name)) return false;
+
             try
             {
-                if (KeysId.Contains(id) && KeysName.Contains(name))
+                var key = new Tuple<TId, TName>(id, name);
+                if (Keys.Contains(key))
                 {
-                    var key = new Tuple<TId, TName>(id, name);
-                    if (Keys.Contains(key))
-                    {
-                        result = _dictionary.Remove(key);
-                    }
+                    result = _dictionary.Remove(key);
                 }
             }
             catch (Exception e)
@@ -101,6 +103,7 @@ namespace UCollection
 
             return result;
         }
+
 
         /// <summary>
         ///  Clear Collection
