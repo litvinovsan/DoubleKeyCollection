@@ -19,8 +19,8 @@ namespace UCollection
          //   ucCollection.Add(1, "", "");
 
             Dictionary<int,string> s=new Dictionary<int, string>();
-           
-
+            s.Add(1,"asas");
+            var a = s[5];
 
         }
     }

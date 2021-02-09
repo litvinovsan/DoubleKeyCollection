@@ -114,7 +114,7 @@ namespace UCollection.Tests
             collection.Add(testId, testName, Val);
             collection.Add(testId, testName, Val);
             // assert
-            Assert.AreEqual(collection.ValuesTuple.ToList()[0], Val);
+            Assert.AreEqual(collection.Values.ToList()[0], Val);
         }
 
         [TestMethod()]
@@ -143,7 +143,7 @@ namespace UCollection.Tests
             TestCollection.Add(p2.Id, p2.Name, p2);
             TestCollection.Add(p3.Id, p3.Name, p3);
 
-            var expectedCnt = TestCollection.KeysTuple.Where(x => x.Item1 .Equals(id)).Select(y => y).ToArray().Length;
+            var expectedCnt = TestCollection.Keys.Where(x => x.Item1 .Equals(id)).Select(y => y).ToArray().Length;
             var result = TestCollection[id].Length;
             //Assert
             Assert.AreEqual(expectedCnt, result);
@@ -201,8 +201,8 @@ namespace UCollection.Tests
             TestCollection.Add(expectedPerson.Id, expectedPerson.Name, expectedPerson);
 
             // Action
-            var result = TestCollection.ContainsValue(expectedPerson);
-            var resultNotExpected = TestCollection.ContainsValue(notExpectedPerson);
+            var result = TestCollection.Contains(expectedPerson);
+            var resultNotExpected = TestCollection.Contains(notExpectedPerson);
 
             // Assert
             Assert.IsTrue(result);

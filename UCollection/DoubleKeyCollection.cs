@@ -20,56 +20,44 @@ namespace UCollection
      *
      * class A<T>: IEnumerable<T>
      //*/
-    public class DoubleKeyCollection<TId, TName, TValue> //:ICollection<>// : IEnumerable<KeyValuePair<TId, TName>, TValue>
+    public class DoubleKeyCollection<TId, TName, TValue> : ICollection// : IEnumerable<KeyValuePair<TId, TName>, TValue>    IQueryable<T>
     {
         #region /// Propetries
 
-       
-        // KeyStruct
-        private readonly Dictionary<KeyStruct, TValue> _dictionaryStruct = new Dictionary<KeyStruct, TValue>();
-        public Dictionary<KeyStruct, TValue>.KeyCollection KeysStruct
+        private readonly Dictionary<Tuple<TId, TName>, TValue> _dictionary = new Dictionary<Tuple<TId, TName>, TValue>();
+
+        private readonly Dictionary<TId, Dictionary<TName, TValue>> _dictionary2 = new Dictionary<TId, Dictionary<TName, TValue>>();
+
+
+        public Dictionary<Tuple<TId, TName>, TValue>.KeyCollection Keys
         {
-            get { return _dictionaryStruct.Keys; }
+            get { return _dictionary.Keys; }
         }
-        public TId[] KeysStructId
+        public TId[] KeysId
         {
-            get { return _dictionaryStruct.Keys.Select(x => x.Id).ToArray(); }
+            get { return _dictionary.Keys.Select(x => x.Item1).ToArray(); }
         }
-        public TName[] KeysStructName
+        public TName[] KeysName
         {
-            get { return _dictionaryStruct.Keys.Select(x => x.Name).ToArray(); }
+            get { return _dictionary.Keys.Select(x => x.Item2).ToArray(); }
         }
-        public Dictionary<KeyStruct, TValue>.ValueCollection ValuesStruct
+        public Dictionary<Tuple<TId, TName>, TValue>.ValueCollection Values
         {
-            get { return _dictionaryStruct.Values; }
-        }
-        public int CountStruct
-        {
-            get { return _dictionaryStruct.Count; }
+            get { return _dictionary.Values; }
         }
 
-        // ValueTuple
-        private readonly Dictionary<Tuple<TId, TName>, TValue> _dictionaryTuple = new Dictionary<Tuple<TId, TName>, TValue>();
-        public Dictionary<Tuple<TId, TName>, TValue>.KeyCollection KeysTuple
+        public void CopyTo(Array array, int index)
         {
-            get { return _dictionaryTuple.Keys; }
+           
         }
-        public TId[] KeysTupleId
-        {
-            get { return _dictionaryTuple.Keys.Select(x => x.Item1).ToArray(); }
-        }
-        public TName[] KeysTupleName
-        {
-            get { return _dictionaryTuple.Keys.Select(x => x.Item2).ToArray(); }
-        }
-        public Dictionary<Tuple<TId, TName>, TValue>.ValueCollection ValuesTuple
-        {
-            get { return _dictionaryTuple.Values; }
-        }
+
         public int Count
         {
-            get { return _dictionaryTuple.Count; }
+            get { return _dictionary.Count; }
         }
+
+        public object SyncRoot { get; }
+        public bool IsSynchronized { get; }
 
         #endregion
 
@@ -100,10 +88,9 @@ namespace UCollection
             if (name == null) throw new ArgumentNullException(nameof(name));
             if (value == null) throw new ArgumentNullException(nameof(value));
 
-            if (!KeysTuple.Contains(new Tuple<TId, TName>(id, name)))
+            if (!Keys.Contains(new Tuple<TId, TName>(id, name)))
             {
-                _dictionaryStruct.Add(new KeyStruct(id, name), value);
-                _dictionaryTuple.Add(new Tuple<TId, TName>(id, name),  value);
+                _dictionary.Add(new Tuple<TId, TName>(id, name), value);
             }
             else
             {
@@ -116,10 +103,86 @@ namespace UCollection
         /// </summary>
         public void Clear()
         {
-            _dictionaryStruct.Clear();
-            _dictionaryTuple.Clear();
+            _dictionary.Clear();
         }
 
+        /// <summary>
+        /// Get Value by both keys
+        /// </summary>
+        /// <param name="id">First key</param>
+        /// <param name="name">second key</param>
+        /// <returns></returns>
+        public TValue this[TId id, TName name]
+        {
+            get
+            {
+                try
+                {
+                    var result = _dictionary[new Tuple<TId, TName>(id, name)];
+
+                    return result;
+                }
+                catch (Exception e)
+                {
+                    throw new KeyNotExistsException($"Requested pair {id} - {name} does not exist", e);
+                }
+            }
+            set
+            {
+                try
+                {
+                    _dictionary[new Tuple<TId, TName>(id, name)] = value;
+                }
+                catch (Exception e)
+                {
+                    throw new KeyNotExistsException($"Requested pair {id} - {name} does not exist", e);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get collection of entries where the first key is equal 'id'
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public KeyValuePair<Tuple<TId, TName>, TValue>[] this[TId id]
+        {
+            get
+            {
+                try
+                {
+                    var result = _dictionary.Where(x => x.Key.Item1.Equals(id)).ToArray();
+
+                    return result;
+                }
+                catch (Exception e)
+                {
+                    throw new KeyNotExistsException($"Requested Key {id} - does not exist", e);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get collection of entries where the second key is equal 'name'
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public KeyValuePair<Tuple<TId, TName>, TValue>[] this[TName name]
+        {
+            get
+            {
+                try
+                {
+                    var result = _dictionary.Where(x => x.Key.Item2.Equals(name)).ToArray();
+
+                    return result;
+                }
+                catch (Exception e)
+                {
+                    throw new KeyNotExistsException($"Requested Key {name} - does not exist", e);
+                }
+            }
+        }
         #endregion
 
         #region /// Exceptions 
@@ -165,17 +228,12 @@ namespace UCollection
 
 
 
-        public bool ContainsKey(object key)
-        {
-            throw new NotImplementedException();
-        }
 
-        public bool ContainsValue(TValue value)
+        public bool Contains(TValue value)
         {
             if (value == null) throw new ArgumentNullException(nameof(value));
 
-            //return _dictionaryStruct.ContainsValue(value);
-            return _dictionaryTuple.ContainsValue(value);
+            return _dictionary.ContainsValue(value);
         }
 
 
@@ -185,109 +243,11 @@ namespace UCollection
             throw new NotImplementedException();
         }
 
-        public TValue this[TId id, TName name]
+
+        public IEnumerator GetEnumerator()
         {
-            get
-            {
-                try
-                {
-                    // var result = _dictionary[new KeyValuePair<TId, TName>(id, name)];
-                   // var result = _dictionaryStruct[new KeyStruct(id, name)];
-                         var result = _dictionaryTuple[new Tuple<TId, TName>(id, name)];
-
-                    return result;
-                }
-                catch (Exception e)
-                {
-                    throw new KeyNotExistsException($"Requested pair {id} - {name} does not exist", e);
-                }
-            }
-            set
-            {
-                try
-                {
-                     _dictionaryStruct[new KeyStruct(id, name)] = value;
-                }
-                catch (Exception e)
-                {
-                    throw new KeyNotExistsException($"Requested pair {id} - {name} does not exist", e);
-                }
-            }
-        }
-        public KeyValuePair<Tuple<TId, TName>, TValue>[] this[TId id]
-        {
-            get
-            {
-                try
-                {
-                    //var result = _dictionaryStruct.Where(x => x.Key.Id.Equals(id)).ToArray();
-                    var result = _dictionaryTuple.Where(x => x.Key.Item1.Equals(id)).ToArray();
-
-                    return result;
-                }
-                catch (Exception e)
-                {
-                    throw new KeyNotExistsException($"Requested Key {id} - does not exist", e);
-                }
-            }
-        }
-
-        public KeyValuePair<Tuple<TId, TName>, TValue>[] this[TName name]
-        {
-            get
-            {
-                try
-                {
-                    
-                   // var result = _dictionaryStruct.Where(x => x.Key.Name.Equals(name)).ToArray();
-                    var result = _dictionaryTuple.Where(x => x.Key.Item2.Equals(name)).ToArray();
-
-                    return result;
-                }
-                catch (Exception e)
-                {
-                    throw new KeyNotExistsException($"Requested Key {name} - does not exist", e);
-                }
-            }
-        }
-
-        public struct KeyStruct : IEquatable<KeyStruct>
-        {
-            public readonly TId Id;
-            public readonly TName Name;
-
-            public KeyStruct(TId id, TName name)
-            {
-                Id = id;
-                Name = name;
-            }
-
-            public bool Equals(KeyStruct other)
-            {
-                 var result = EqualityComparer<TId>.Default.Equals(Id, other.Id)
-                             && EqualityComparer<TName>.Default.Equals(Name, other.Name);
-
-               
-                return result;
-            }
-
-            public override bool Equals(object other)
-            {
-                return other is KeyStruct && Equals((KeyStruct)other);
-            }
-
-            public override int GetHashCode()
-            {
-                var result = 17;
-                unchecked
-                {
-                    //result = 31 * result + EqualityComparer<TId>.Default.GetHashCode(Id);
-                    //result = 31 * result + EqualityComparer<TName>.Default.GetHashCode(Name);
-                    //return result;
-                    return Id.GetHashCode() ^ Name.GetHashCode();
-                }
-            }
-
+            throw new NotImplementedException();
         }
     }
 }
+
