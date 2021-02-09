@@ -441,33 +441,7 @@ namespace UCollection.Tests
         {
             Assert.Fail();
         }
-
-
-
-        [TestMethod()]
-        public void AddTest2()
-        {
-            Assert.Fail();
-        }
-
-        [TestMethod()]
-        public void ClearTest2()
-        {
-            Assert.Fail();
-        }
-
-        [TestMethod()]
-        public void ContainsTest1()
-        {
-            Assert.Fail();
-        }
-
-        [TestMethod()]
-        public void RemoveTest1()
-        {
-            Assert.Fail();
-        }
-
-
+       
+      
     }
 }
