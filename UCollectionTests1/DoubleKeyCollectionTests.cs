@@ -1,37 +1,20 @@
-﻿using UCollection;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
-using System.Threading;
+using System.Linq;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using UCollection;
+using UCollection.UserTypes;
 
-namespace UCollection.Tests
+
+namespace UCollectionTests1
 {
     [TestClass()]
     public class DoubleKeyCollectionTests
     {
         #region /// Initialization
 
-        private class Person
-        {
-            public int Id { get; set; }
-            public string Name { get; }
 
-            public Person()
-            {
-                Id = IdCnt++;
-                Name = Guid.NewGuid().ToString();
-            }
-
-            public Person(int id, string name)
-            {
-                Id = id;
-                Name = name;
-            }
-
-            public static int IdCnt = 0;
-        }
 
         private DoubleKeyCollection<int, string, Person> _testCollection;
 
@@ -48,9 +31,9 @@ namespace UCollection.Tests
             _person2 = new Person();
             _person3 = new Person();
 
-            _testCollection.Add(_person1.Id, _person1.Name, _person1);
-            _testCollection.Add(_person2.Id, _person2.Name, _person2);
-            _testCollection.Add(_person3.Id, _person3.Name, _person3);
+            _testCollection.Add(_person1.Id, _person1.Notes, _person1);
+            _testCollection.Add(_person2.Id, _person2.Notes, _person2);
+            _testCollection.Add(_person3.Id, _person3.Notes, _person3);
         }
 
         [TestCleanup]
@@ -67,7 +50,7 @@ namespace UCollection.Tests
 
             //Action
             var p = new Person();
-            _testCollection.Add(p.Id, p.Name, p);
+            _testCollection.Add(p.Id, p.Notes, p);
             _testCollection.Clear();
             var actual = _testCollection.Count;
 
@@ -77,8 +60,6 @@ namespace UCollection.Tests
         #endregion
 
         #region /// Add and Remove Tests
-
-        #region /// "Add" Method
         [TestMethod()]
         [Timeout(2000)]
         public void AddTest()
@@ -125,21 +106,20 @@ namespace UCollection.Tests
             Assert.ThrowsException<ArgumentNullException>(() => collection.Add(1, null, null));
         }
 
-        #endregion
-
         [TestMethod()]
         public void Same_Id_Test()
         {
             //Arrange
             var id = _person1.Id;
-            var p1 = new Person() { Id = id };
-            var p2 = new Person() { Id = id };
-            var p3 = new Person() { Id = id };
+            var p1 = new Person(id, "qwqww");
+            var p2 = new Person(id, "xxasas");
+
+            var p3 = new Person(id, "llll");
 
             //Action
-            _testCollection.Add(p1.Id, p1.Name, p1);
-            _testCollection.Add(p2.Id, p2.Name, p2);
-            _testCollection.Add(p3.Id, p3.Name, p3);
+            _testCollection.Add(p1.Id, p1.Notes, p1);
+            _testCollection.Add(p2.Id, p2.Notes, p2);
+            _testCollection.Add(p3.Id, p3.Notes, p3);
 
             var expectedCnt = _testCollection.Keys.Where(x => x.Item1.Equals(id)).Select(y => y).ToArray().Length;
             var result = _testCollection[id].Count();
@@ -147,13 +127,12 @@ namespace UCollection.Tests
             Assert.AreEqual(expectedCnt, result);
         }
 
-
         [TestMethod()]
         public void RemoveTest()
         {
             // Arrange 
             var expectedId = _person2.Id;
-            var expectedName = _person2.Name;
+            var expectedName = _person2.Notes;
 
             // Action
             var isContains = _testCollection.Contains(expectedId, expectedName);
@@ -185,6 +164,222 @@ namespace UCollection.Tests
         }
         #endregion
 
+        #region /// UserTypes Id and Name
+
+        [TestMethod()]
+        public void Contains_Id_UserTypes_Test()
+        {
+            // Arrange
+            var utCollection = new DoubleKeyCollection<IdKey, NameKey, Person>();
+
+            // 1 Значение
+            var idType = new IdKey(1);
+            var idValue = idType.Id;
+
+            var nameType = new NameKey("A");
+            var nameValue = nameType.Name;
+
+            var personType = new Person(idValue, nameValue);
+            var personIdValue = personType.Id;
+            var personNotesValue = personType.Notes;
+
+            // 2 Значение
+            var idType2 = new IdKey(2);
+            var idValue2 = idType2.Id;
+
+            var nameType2 = new NameKey("B");
+            var nameValue2 = nameType2.Name;
+
+            var personType2 = new Person(idValue2, nameValue2);
+            var personIdValue2 = personType2.Id;
+            var personNotesValue2 = personType2.Notes;
+
+            utCollection.Clear();
+            utCollection.Add(new IdKey(idValue), new NameKey(nameValue), new Person(idValue, nameValue));
+            utCollection.Add(new IdKey(idValue2), new NameKey(nameValue2), new Person(idValue2, nameValue2));
+
+            // Action
+            var newIdKey = new IdKey(idValue);
+            var isContainsByValue = utCollection.Contains(newIdKey);
+            var isContainsByRef = utCollection.Contains(idType);
+
+            var hCodeId = newIdKey.GetHashCode();
+            var hcIdType = idType.GetHashCode();
+
+            // Assert
+            Assert.IsFalse(utCollection.Contains(new IdKey(434)));
+            Assert.AreEqual(hcIdType, hCodeId);
+            Assert.IsTrue(isContainsByValue);
+            Assert.IsTrue(isContainsByRef);
+        }
+
+        [TestMethod()]
+        public void Contains_Name_UserTypes_Test()
+        {
+            // Arrange
+            var utCollection = new DoubleKeyCollection<IdKey, NameKey, Person>();
+
+            // 1 Значение
+            var idType = new IdKey(1);
+            var idValue = idType.Id;
+
+            var nameType = new NameKey("A");
+            var nameValue = nameType.Name;
+
+            var personType = new Person(idValue, nameValue);
+            var personIdValue = personType.Id;
+            var personNotesValue = personType.Notes;
+
+            // 2 Значение
+            var idType2 = new IdKey(2);
+            var idValue2 = idType2.Id;
+
+            var nameType2 = new NameKey("B");
+            var nameValue2 = nameType2.Name;
+
+            var personType2 = new Person(idValue2, nameValue2);
+            var personIdValue2 = personType2.Id;
+            var personNotesValue2 = personType2.Notes;
+
+            utCollection.Clear();
+            utCollection.Add(new IdKey(idValue), new NameKey(nameValue), new Person(idValue, nameValue));
+            utCollection.Add(new IdKey(idValue2), new NameKey(nameValue2), new Person(idValue2, nameValue2));
+
+            // Action
+            var newNameKey = new NameKey(nameValue);
+            var isContainsByValue = utCollection.Contains(newNameKey);
+            var isContainsByRef = utCollection.Contains(nameType);
+
+            var hCodeId = newNameKey.GetHashCode();
+            var hcIdType = nameType.GetHashCode();
+
+            // Assert
+            Assert.IsFalse(utCollection.Contains(new NameKey("C")));
+            Assert.AreEqual(hcIdType, hCodeId);
+            Assert.IsTrue(isContainsByValue);
+            Assert.IsTrue(isContainsByRef);
+        }
+
+        [TestMethod()]
+        public void Contains_Value_UserTypes_Test()
+        {
+            // Arrange
+            var utCollection = new DoubleKeyCollection<IdKey, NameKey, Person>();
+
+            // 1 Значение
+            var idType = new IdKey(1);
+            var idValue = idType.Id;
+
+            var nameType = new NameKey("A");
+            var nameValue = nameType.Name;
+
+            var personType = new Person(idValue, nameValue);
+            var personIdValue = personType.Id;
+            var personNotesValue = personType.Notes;
+
+            // 2 Значение
+            var idType2 = new IdKey(2);
+            var idValue2 = idType2.Id;
+
+            var nameType2 = new NameKey("B");
+            var nameValue2 = nameType2.Name;
+
+            var personType2 = new Person(idValue2, nameValue2);
+            var personIdValue2 = personType2.Id;
+            var personNotesValue2 = personType2.Notes;
+
+            utCollection.Clear();
+            utCollection.Add(new IdKey(idValue), new NameKey(nameValue), new Person(idValue, nameValue));
+            utCollection.Add(idType2, nameType2, personType2);
+
+            // Action
+            var isContainsByValue = utCollection.Contains(new Person(idValue2, nameValue2));
+            var isContainsByRef = utCollection.Contains(personType2);
+
+            // Assert
+            Assert.IsTrue(isContainsByValue);
+            Assert.IsTrue(isContainsByRef);
+        }
+
+        [TestMethod()]
+        public void Contains_Id_Name_UserTypes_Test()
+        {
+            // Arrange
+            var utCollection = new DoubleKeyCollection<IdKey, NameKey, Person>();
+
+            // 1 Значение
+            var idType = new IdKey(1);
+            var idValue = idType.Id;
+
+            var nameType = new NameKey("A");
+            var nameValue = nameType.Name;
+
+            var personType = new Person(idValue, nameValue);
+            var personIdValue = personType.Id;
+            var personNotesValue = personType.Notes;
+
+            // 2 Значение
+            var idType2 = new IdKey(2);
+            var idValue2 = idType2.Id;
+
+            var nameType2 = new NameKey("B");
+            var nameValue2 = nameType2.Name;
+
+            var personType2 = new Person(idValue2, nameValue2);
+            var personIdValue2 = personType2.Id;
+            var personNotesValue2 = personType2.Notes;
+
+            utCollection.Clear();
+            utCollection.Add(new IdKey(idValue), new NameKey(nameValue), new Person(idValue, nameValue));
+            utCollection.Add(idType2, nameType2, personType2);
+
+            // Action
+            var isContainsByValue = utCollection.Contains(new IdKey(idValue), new NameKey(nameValue));
+
+            // Assert
+            Assert.IsTrue(isContainsByValue);
+        }
+
+        [TestMethod()]
+        public void Index_Id_Name_UserTypes_Test()
+        {
+            // Arrange
+            var utCollection = new DoubleKeyCollection<IdKey, NameKey, Person>();
+
+            // 1 Значение
+            var idType = new IdKey(1);
+            var idValue = idType.Id;
+
+            var nameType = new NameKey("A");
+            var nameValue = nameType.Name;
+
+            var personType = new Person(idValue, nameValue);
+            var personIdValue = personType.Id;
+            var personNotesValue = personType.Notes;
+
+            // 2 Значение
+            var idType2 = new IdKey(2);
+            var idValue2 = idType2.Id;
+
+            var nameType2 = new NameKey("B");
+            var nameValue2 = nameType2.Name;
+
+            var personType2 = new Person(idValue2, nameValue2);
+            var personIdValue2 = personType2.Id;
+            var personNotesValue2 = personType2.Notes;
+
+            utCollection.Clear();
+            utCollection.Add(new IdKey(idValue), new NameKey(nameValue), new Person(idValue, nameValue));
+            utCollection.Add(idType2, nameType2, personType2);
+
+            // Action
+            var actualPerson = utCollection[new IdKey(idValue), new NameKey(nameValue)];
+
+            // Assert
+            Assert.AreEqual(personType, actualPerson);
+        }
+        #endregion
+
         #region /// Get Values Tests
 
         [TestMethod()]
@@ -192,7 +387,7 @@ namespace UCollection.Tests
         {
             //Arrange
             List<int> idListExpected = new List<int>() { _person1.Id, _person2.Id, _person3.Id };
-            List<string> nameListExpected = new List<string>() { _person1.Name, _person2.Name, _person3.Name };
+            List<string> nameListExpected = new List<string>() { _person1.Notes, _person2.Notes, _person3.Notes };
 
             //Action
             List<int> idListResult = new List<int>();
@@ -213,7 +408,7 @@ namespace UCollection.Tests
         public void TryGetValueTest()
         {
             var person = new Person();
-            var result = _testCollection.TryGetValue(_person1.Id, _person1.Name, out person);
+            var result = _testCollection.TryGetValue(_person1.Id, _person1.Notes, ref person);
             Assert.IsTrue(result);
             Assert.AreEqual(person, _person1);
         }
@@ -222,7 +417,23 @@ namespace UCollection.Tests
         public void TryGetValue_No_entry_Test()
         {
             var person = new Person();
-            var result = _testCollection.TryGetValue(person.Id, person.Name, out person);
+            var result = _testCollection.TryGetValue(person.Id, person.Notes, ref person);
+            Assert.IsFalse(result);
+        }
+
+        [TestMethod()]
+        public void TryGetValueTest1()
+        {
+            var tempPerson = new Person();
+
+            // Action
+            var result = _testCollection.TryGetValue(_person2.Notes, ref tempPerson);
+
+            // Assert
+            Assert.IsTrue(result);
+            Assert.AreEqual(tempPerson, _person2);
+
+            result = _testCollection.TryGetValue("dummy", ref tempPerson);
             Assert.IsFalse(result);
         }
 
@@ -231,7 +442,7 @@ namespace UCollection.Tests
         {
             //Arrange
             var id = _person1.Id;
-            var name = _person1.Name;
+            var name = _person1.Notes;
 
             //Action
             var result = _testCollection[id, name];
@@ -271,7 +482,7 @@ namespace UCollection.Tests
             // Arrange
             var expectedPerson = new Person();
             var notExpectedPerson = new Person();
-            _testCollection.Add(expectedPerson.Id, expectedPerson.Name, expectedPerson);
+            _testCollection.Add(expectedPerson.Id, expectedPerson.Notes, expectedPerson);
 
             // Action
             var result = _testCollection.Contains(expectedPerson);
@@ -287,10 +498,10 @@ namespace UCollection.Tests
         {
             // Arrange
             var testPerson = new Person();
-            _testCollection.Add(testPerson.Id, testPerson.Name, testPerson);
+            _testCollection.Add(testPerson.Id, testPerson.Notes, testPerson);
 
             // Actions
-            var actual = _testCollection.Contains(testPerson.Id, testPerson.Name);
+            var actual = _testCollection.Contains(testPerson.Id, testPerson.Notes);
             _testCollection.Contains(testPerson);
 
             // Assert
@@ -314,7 +525,7 @@ namespace UCollection.Tests
         public void Contains_Name_Test()
         {
             // Arrange 
-            var expName = _person1.Name;
+            var expName = _person1.Notes;
 
             // Action
             var result = _testCollection.Contains(expName);
@@ -335,19 +546,19 @@ namespace UCollection.Tests
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                _testCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Notes, person);
             }
 
             var expectedPerson = new Person();
             var id = expectedPerson.Id;
-            var name = expectedPerson.Name;
+            var name = expectedPerson.Notes;
 
-            _testCollection.Add(expectedPerson.Id, expectedPerson.Name, expectedPerson);
+            _testCollection.Add(expectedPerson.Id, expectedPerson.Notes, expectedPerson);
 
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                _testCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Notes, person);
             }
 
             //Action
@@ -374,7 +585,7 @@ namespace UCollection.Tests
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                _testCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Notes, person);
             }
 
             var expectedPerson = new Person();
@@ -384,21 +595,21 @@ namespace UCollection.Tests
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                _testCollection.Add(expectedPersonId, p.Name, p);
+                _testCollection.Add(expectedPersonId, p.Notes, p);
             }
 
             // Init random entries
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                _testCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Notes, person);
             }
 
             // Init Expected values
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                _testCollection.Add(expectedPersonId, p.Name, p);
+                _testCollection.Add(expectedPersonId, p.Notes, p);
             }
 
             //Action
@@ -427,11 +638,11 @@ namespace UCollection.Tests
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                _testCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Notes, person);
             }
 
             var expectedPerson = new Person();
-            var expectedName = expectedPerson.Name;
+            var expectedName = expectedPerson.Notes;
 
             // Init Expected values
             for (int i = 0; i < 15; i++)
@@ -444,7 +655,7 @@ namespace UCollection.Tests
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                _testCollection.Add(person.Id, person.Name, person);
+                _testCollection.Add(person.Id, person.Notes, person);
             }
 
             // Init Expected values
@@ -470,63 +681,37 @@ namespace UCollection.Tests
             Assert.AreEqual(30, actualdLength);
         }
 
-        #region ReferenceType Id and Name
-        class TestKeyName
-        {
-            private string Name { get; set; }
-
-            public TestKeyName()
-            {
-                Name = Guid.NewGuid().ToString();
-            }
-        }
-
-        class TestKeyId
-        {
-            public int Id { get; set; }
-
-            public TestKeyId()
-            {
-                Id = new Random().Next(65534);
-            }
-        }
+        #region ReferenceType Id and Notes
 
         [TestMethod()]
         public void SpeedTest_Reference_Type_Key_Get_Value_Test()
         {
             //Arrange
             Stopwatch stopWatch = new Stopwatch();
-            var collection = new DoubleKeyCollection<TestKeyId, TestKeyName, Person>();
+            var collection = new DoubleKeyCollection<IdKey, NameKey, Person>();
 
-            // Init random entries
-            for (int i = 0; i < 100000; i++)
-            {
-                var person = new Person();
-                collection.Add(new TestKeyId(), new TestKeyName(), person);
-            }
 
-            var expectedPerson = new Person();
-            var expectedName = new TestKeyName();
+            var expectedName = new NameKey();
 
             // Init Expected values
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                collection.Add(new TestKeyId(), expectedName, p);
+                collection.Add(new IdKey(), expectedName, p);
             }
 
             // Init random entries
             for (int i = 0; i < 100000; i++)
             {
                 var person = new Person();
-                collection.Add(new TestKeyId(), new TestKeyName(), person);
+                collection.Add(new IdKey(), new NameKey(), person);
             }
 
             // Init Expected values
             for (int i = 0; i < 15; i++)
             {
                 var p = new Person();
-                collection.Add(new TestKeyId(), expectedName, p);
+                collection.Add(new IdKey(), expectedName, p);
             }
 
             //Action

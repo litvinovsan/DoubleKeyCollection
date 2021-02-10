@@ -44,6 +44,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DoubleKeyCollection.cs" />
+    <Compile Include="UserTypes\IdKey.cs" />
+    <Compile Include="UserTypes\NameKey.cs" />
+    <Compile Include="UserTypes\Person.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
