@@ -9,7 +9,7 @@ namespace UCollection
         {
             Console.WriteLine("\n\rПример использования коллекции \r\n ");
             // Start init.
-            var collection = new DoubleKeyCollection<IdKey, NameKey, Person>
+            var collection = new MultiCollection<IdKey, NameKey, Person>
                 {
                     {new IdKey(4), new NameKey("Tom"), new Person(4,"some info")},
                     {new IdKey(1), new NameKey("Alex"), new Person()},
@@ -21,66 +21,65 @@ namespace UCollection
 
                 };
 
-            // Добавление записи
 
             // Перебор колекции 
             foreach (var item in collection)
             {
-                Console.WriteLine($"Id:  {item.Id}, Name: {item.Name},  Value:{item.Value}");
+                Console.WriteLine($"{item.Id}, {item.Name},  {item.Value}");
             }
 
             Console.WriteLine($"\n\rКоличество записей: {collection.Count}");
 
-            // Содержит Ключ 1?
+            // Метод Contains для Id
             var expectedId = new IdKey(4);
             var bResult = collection.Contains(expectedId);
-            Console.WriteLine($"Содержит {expectedId}? {bResult}\n\r");
+            Console.WriteLine($"\n\rСодержит '{expectedId}' ? => '{bResult}'\n\r");
 
-            // Содержит Ключ 2?
+            // Метод Contains для Name
             var expectedName = new NameKey("Jerry");
             bResult = collection.Contains(expectedName);
-            Console.WriteLine($"Содержит {expectedName}? {bResult}\n\r");
+            Console.WriteLine($"\n\nСодержит '{expectedName}' ? => {bResult}\n\r");
 
-            // Содержит Value?
-            var expectedValue = new Person(4, "some info");
+            // Метод Contains для Value
+            var expectedValue = new Person(4, "ABC");
             bResult = collection.Contains(expectedValue);
-            Console.WriteLine($"Содержит {expectedValue}? {bResult}\n\r");
+            Console.WriteLine($"Содержит '{expectedValue}' значение? => {bResult}\n\r");
 
-            // Получение значения по уникальной комбинации Id - Name
+            // Индексатор  Id - Name
             var myId = new IdKey(4);
             var myName = new NameKey("Tom");
             var value = collection[myId, myName];
-            Console.WriteLine($"Получение значения через индексатор для {myId} {myName}:  {value}\n\r");
+            Console.WriteLine($"\n\rПолучение значения через индексатор ['{myId}','{myName}'] =>  {value}\n\r");
 
-            // Получение списка записей Id-Value у которых совпадает Name
-            Console.WriteLine($"\n\rСписок записей Id-Value у которых совпадает поле {myName}:");
-            var etriesByName = collection[myName];
-            foreach (var entr in etriesByName)
+            // Индексатор Name
+            Console.WriteLine($"\n\rСписок записей c полем '{myName}': ");
+            var entrs = collection[myName];
+            foreach (var entr in entrs)
             {
-                Console.WriteLine($"{entr.Item1} - {entr.Item2}");
+                Console.WriteLine($"'{entr.Key.Id }' - '{entr.Value}'");
             }
 
-            // Получение списка записей Name-Value у которых совпадает Id
-            Console.WriteLine($"\n\rСписок записей Name-Value у которых совпадает {myId}:");
+            // Индексатор Id
+            Console.WriteLine($"\n\rСписок записей у которых есть '{myId}':");
             var etriesById = collection[myId];
             foreach (var entr in etriesById)
             {
-                Console.WriteLine($"{entr.Item1} - {entr.Item2}");
+                Console.WriteLine($"'{entr.Key.Name}'  '{entr.Key.Id}'");
             }
 
-            // Попытка получения значения по id-name
+            // Попытка получения значения по ключу
             Person p = new Person();
             bResult = collection.TryGetValue(myId, myName, ref p);
-            Console.WriteLine($"Получить значение по id-name: {p} {bResult}");
+            Console.WriteLine($"\n\rПолучить значение по двум ключам '{myId.Id} {myName.Name}': => {p} => {bResult}\n\r");
 
-            // Попытка получения значения только по Id. В этом случае Id должен быть уникальным
+            // Попытка получения значения только по Id.  
             var myId2 = new IdKey(9);
             var myName2 = new NameKey("Enik");
 
-            collection.Add(myId, myName, new Person(myId2.Id, myName2.Name));
+            collection.Add(myId2, myName2, new Person(myId2.Id, myName2.Name));
 
-            bResult = collection.TryGetValue(myId, ref p);
-            Console.WriteLine($"Получить значение по id-name: {p} {bResult}");
+            bResult = collection.TryGetValue(myId2, ref p);
+            Console.WriteLine($"Получить значение {myId2}: => {p} => {bResult}");
 
             Console.WriteLine(" ");
             Console.ReadLine();

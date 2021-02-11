@@ -19,13 +19,11 @@ namespace UCollection.UserTypes
             Notes = notes;
         }
 
-        public static int IdCnt;
+        public static int IdCnt=99;
 
         public bool Equals(Person other)
         {
-            var person = other as Person;
-
-            if (person == null) return false;
+            if (!(other is Person person)) return false;
 
             return Id.Equals(other.Id) && Notes.Equals(other.Notes);
         }
@@ -43,7 +41,7 @@ namespace UCollection.UserTypes
 
         public override string ToString()
         {
-            return $"Person info: Id-{Id}, Notes-{Notes}";
+            return $"Person: Id {Id}, Notes {Notes}";
         }
     }
 }

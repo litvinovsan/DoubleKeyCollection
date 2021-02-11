@@ -2,32 +2,33 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace UCollection
 {
-    public class DoubleKeyCollection<TId, TName, TValue> : IEnumerable<DoubleKeyCollection<TId, TName, TValue>.KeyValueStruct>
+    public class MultiCollection<TId, TName, TValue> : IEnumerable<MultiCollection<TId, TName, TValue>.KeyValueStruct>
         where TId : IEquatable<TId> where TName : IEquatable<TName>
     {
         #region /// Propetries
 
-        private readonly Dictionary<Tuple<TId, TName>, TValue> _dictionary = new Dictionary<Tuple<TId, TName>, TValue>();
-        public Dictionary<Tuple<TId, TName>, TValue>.KeyCollection Keys
+        // Main collections
+        private readonly Dictionary<KeyStruct, TValue> _dictionary = new Dictionary<KeyStruct, TValue>();
+        private readonly Dictionary<TId, List<TName>> _dIdName = new Dictionary<TId, List<TName>>();
+        private readonly Dictionary<TName, List<TId>> _dNameId = new Dictionary<TName, List<TId>>();
+
+        public Dictionary<KeyStruct, TValue>.KeyCollection Keys
         {
             get { return _dictionary.Keys; }
         }
-        public Dictionary<Tuple<TId, TName>, TValue>.ValueCollection Values
+        public Dictionary<KeyStruct, TValue>.ValueCollection Values
         {
             get { return _dictionary.Values; }
         }
-        ///  Total number of entries in collection
         public int Count
         {
             get { return _dictionary.Count; }
         }
 
+        private readonly object _locker = new object();
         #endregion
 
         #region /// Methods
@@ -44,19 +45,24 @@ namespace UCollection
             if (name == null) throw new ArgumentNullException(nameof(name));
             if (value == null) throw new ArgumentNullException(nameof(value));
 
-            var keyToAdd = new Tuple<TId, TName>(id, name);
+            var keyToAdd = new KeyStruct(id, name);
 
-            if (Keys.Contains(keyToAdd)) throw new KeyAlreadyExistsException($"Key: {id} - {name} already exists"); ;
+            if (Keys.Contains(keyToAdd))
+            {
+                throw new KeyAlreadyExistsException($"Key: {id} - {name} already exists");
+            }
 
             try
             {
-                var tuple = new Tuple<TId, TName>(id, name);
-
-                _dictionary.Add(tuple, value);
+                lock (_locker)
+                {
+                    _dictionary.Add(keyToAdd, value);
+                    SaveKeyPairHelper(id, name);
+                }
             }
             catch (Exception)
             {
-                throw new KeyAlreadyExistsException($"Key: {id} - {name} already exists");
+                throw new CollectionException($"Key: {id} - {name} adding error");
             }
         }
 
@@ -76,15 +82,20 @@ namespace UCollection
 
             try
             {
-                var key = new Tuple<TId, TName>(id, name);
-                if (Keys.Contains(key))
+                var key = new KeyStruct(id, name);
+
+                lock (_locker)
                 {
-                    result = _dictionary.Remove(key);
+                    if (Keys.Contains(key))
+                    {
+                        result = _dictionary.Remove(key);
+                        RemoveKeyPairHelper(id, name);
+                    }
                 }
             }
             catch (Exception e)
             {
-                throw new DoubleKeyCollectionException("Remove operation Error. " + e.Message);
+                throw new CollectionException("Remove operation Error. " + e.Message);
             }
 
             return result;
@@ -95,7 +106,12 @@ namespace UCollection
         /// </summary>
         public void Clear()
         {
-            _dictionary.Clear();
+            lock (_locker)
+            {
+                _dictionary.Clear();
+                _dNameId.Clear();
+                _dIdName.Clear();
+            }
         }
 
         /// <summary>
@@ -110,11 +126,12 @@ namespace UCollection
             if (id == null) throw new ArgumentNullException(nameof(id));
             if (name == null) throw new ArgumentNullException(nameof(name));
 
-            return _dictionary.TryGetValue(new Tuple<TId, TName>(id, name), out value);
+            return _dictionary.TryGetValue(new KeyStruct(id, name), out value);
         }
 
         /// <summary>
-        /// Returns True in case of success getting value by Id
+        /// Returns True in case of success getting value by Id.
+        /// Attention! Returns the first value found with the specified Id.
         /// </summary>
         /// <param name="id"></param>
         /// <param name="value"></param>
@@ -126,20 +143,18 @@ namespace UCollection
             if (!Contains(id)) return false;
             try
             {
-                value = this[id].First().Item2;
+                value = this[id].First().Value;
             }
             catch (Exception e)
             {
                 throw new ValueNotExistsException($"Value could not be retrieved", e);
             }
-
             return true;
         }
 
         /// <summary>
         /// Returns True in case of success getting value by Name
         /// </summary>
-        /// <param name="id"></param>
         /// <param name="name"></param>
         /// <param name="value"></param>
         /// <returns></returns>
@@ -150,7 +165,7 @@ namespace UCollection
             if (!Contains(name)) return false;
             try
             {
-                value = this[name].First().Item2;
+                value = this[name].First().Value;
             }
             catch (Exception e)
             {
@@ -176,8 +191,11 @@ namespace UCollection
 
                 try
                 {
-                    var result = _dictionary[new Tuple<TId, TName>(id, name)];
-                    return result;
+                    lock (_locker)
+                    {
+                        var result = _dictionary[new KeyStruct(id, name)];
+                        return result;
+                    }
                 }
                 catch (Exception e)
                 {
@@ -190,7 +208,7 @@ namespace UCollection
                 if (name == null) throw new ArgumentNullException(nameof(name));
                 try
                 {
-                    _dictionary[new Tuple<TId, TName>(id, name)] = value;
+                    _dictionary[new KeyStruct(id, name)] = value;
                 }
                 catch (Exception e)
                 {
@@ -204,15 +222,37 @@ namespace UCollection
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public IEnumerable<Tuple<TName, TValue>> this[TId id]
+        public IEnumerable<KeyValuePair<KeyStruct, TValue>> this[TId id]
         {
             get
             {
                 if (id == null) throw new ArgumentNullException(nameof(id));
                 try
                 {
-                    var result = _dictionary.Where(x => x.Key.Item1.Equals(id)).Select((z) => new Tuple<TName, TValue>(z.Key.Item2, z.Value));
-                    return result;
+                    var isSuccess = _dIdName.TryGetValue(id, out var namesList);
+
+                    if (!isSuccess || namesList.Count == 0) throw new KeyNotExistsException($"Requested Key {id} - does not exist");
+
+                    IEnumerable<KeyValuePair<KeyStruct, TValue>> resultEnumerable;
+
+                    if (namesList.Count == 1)
+                    {
+                        var strKey = new KeyStruct(id, namesList[0]);
+                        resultEnumerable = _dictionary.Where(x => x.Key.Equals(strKey));
+                    }
+                    else // NamesList contains more than 1 entries for uniq id.     1-"A"  1-"B" 1-"C"
+                    {
+                        var keyStructs = new KeyStruct[namesList.Count];
+
+                        for (int i = 0; i < namesList.Count; i++)
+                        {
+                            keyStructs[i] = new KeyStruct(id, namesList[i]);
+                        }
+
+                        resultEnumerable = keyStructs.Select(x => new KeyValuePair<KeyStruct, TValue>(x, _dictionary[x]));
+                    }
+
+                    return resultEnumerable;
                 }
                 catch (Exception e)
                 {
@@ -226,16 +266,39 @@ namespace UCollection
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
-        public IEnumerable<Tuple<TId, TValue>> this[TName name]
+        public IEnumerable<KeyValuePair<KeyStruct, TValue>> this[TName name]
         {
             get
             {
                 if (name == null) throw new ArgumentNullException(nameof(name));
                 try
                 {
-                    var result = _dictionary.Where(x => x.Key.Item2.Equals(name)).Select((z) => new Tuple<TId, TValue>(z.Key.Item1, z.Value));
+                    var isSuccess = _dNameId.TryGetValue(name, out var idList);
 
-                    return result;
+                    if (!isSuccess || idList.Count == 0) throw new KeyNotExistsException($"Requested Key {name} - does not exist");
+
+                    IEnumerable<KeyValuePair<KeyStruct, TValue>> resultEnumerable;
+
+                    if (idList.Count == 1)
+                    {
+                        var strKey = new KeyStruct(idList[0], name);
+
+
+                        resultEnumerable = _dictionary.Where(x => x.Key.Equals(strKey));
+                    }
+                    else // IdList contains more than 1 entries for uniq name.      "A" - 1; "A" - 2; "A" - 3
+                    {
+                        var keyStructs = new KeyStruct[idList.Count];
+
+                        for (int i = 0; i < idList.Count; i++)
+                        {
+                            keyStructs[i] = new KeyStruct(idList[i], name);
+                        }
+
+                        resultEnumerable = keyStructs.Select(x => new KeyValuePair<KeyStruct, TValue>(x, _dictionary[x]));
+                    }
+
+                    return resultEnumerable;
                 }
                 catch (Exception e)
                 {
@@ -253,7 +316,10 @@ namespace UCollection
         {
             if (value == null) throw new ArgumentNullException(nameof(value));
 
-            return _dictionary.ContainsValue(value);
+            lock (_locker)
+            {
+                return _dictionary.ContainsValue(value);
+            }
         }
 
         /// <summary>
@@ -267,7 +333,10 @@ namespace UCollection
             if (id == null) throw new ArgumentNullException(nameof(id));
             if (name == null) throw new ArgumentNullException(nameof(name));
 
-            return _dictionary.Count(x => x.Key.Item1.Equals(id) && x.Key.Item2.Equals(name)) > 0;
+            lock (_locker)
+            {
+                return _dictionary.ContainsKey(new KeyStruct(id, name));
+            }
         }
 
         /// <summary>
@@ -279,7 +348,10 @@ namespace UCollection
         {
             if (id == null) throw new ArgumentNullException(nameof(id));
 
-            return _dictionary.Keys.FirstOrDefault(x => x.Item1.Equals(id)) != null;
+            lock (_locker)
+            {
+                return _dIdName.ContainsKey(id);
+            }
         }
 
         /// <summary>
@@ -291,8 +363,80 @@ namespace UCollection
         {
             if (name == null) throw new ArgumentNullException(nameof(name));
 
-            return _dictionary.Keys.FirstOrDefault(x => x.Item2.Equals(name)) != null;
+            lock (_locker)
+            {
+                return _dNameId.ContainsKey(name);
+            }
         }
+
+
+        #region /// Helper Methods
+
+        /// <summary>
+        /// Store Keys to helper collections to get Values faster
+        /// </summary>
+        /// <param name="idKey"></param>
+        /// <param name="nameKey"></param>
+        private void SaveKeyPairHelper(TId idKey, TName nameKey)
+        {
+            // Id -List<Name> Collection
+            if (_dIdName.ContainsKey(idKey))
+            {
+                _dIdName[idKey].Add(nameKey);
+            }
+            else
+            {
+                _dIdName.Add(idKey, new List<TName>() { nameKey });
+            }
+
+            // Name -List<Id> Collection
+
+            if (_dNameId.ContainsKey(nameKey))
+            {
+                _dNameId[nameKey].Add(idKey);
+            }
+            else
+            {
+                _dNameId.Add(nameKey, new List<TId>() { idKey });
+            }
+        }
+
+        /// <summary>
+        /// Remove Keys to helper collections to get Values faster
+        /// </summary>
+        /// <param name="idKey"></param>
+        /// <param name="nameKey"></param>
+        private void RemoveKeyPairHelper(TId idKey, TName nameKey)
+        {
+            // Id -List<Name> Collection
+            if (_dIdName.ContainsKey(idKey))
+            {
+                if (_dIdName[idKey].Count > 1)
+                {
+                    _dIdName[idKey].Remove(nameKey);
+                }
+                else
+                {
+                    _dIdName.Remove(idKey);
+                }
+            }
+            // Name -List<Id> Collection
+
+            if (_dNameId.ContainsKey(nameKey))
+            {
+                if (_dNameId[nameKey].Count > 1)
+                {
+                    _dNameId[nameKey].Remove(idKey);
+                }
+                else
+                {
+                    _dNameId.Remove(nameKey);
+                }
+            }
+        }
+
+        #endregion
+
         #endregion
 
         #region /// Exceptions 
@@ -309,12 +453,12 @@ namespace UCollection
         }
 
         [Serializable]
-        public class DoubleKeyCollectionException : Exception
+        public class CollectionException : Exception
         {
-            public DoubleKeyCollectionException() { }
-            public DoubleKeyCollectionException(string message) : base(message) { }
-            public DoubleKeyCollectionException(string message, Exception inner) : base(message, inner) { }
-            protected DoubleKeyCollectionException(
+            public CollectionException() { }
+            public CollectionException(string message) : base(message) { }
+            public CollectionException(string message, Exception inner) : base(message, inner) { }
+            protected CollectionException(
                 System.Runtime.Serialization.SerializationInfo info,
                 System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
         }
@@ -355,8 +499,8 @@ namespace UCollection
                 yield return
                     new KeyValueStruct()
                     {
-                        Id = item.Key.Item1,
-                        Name = item.Key.Item2,
+                        Id = item.Key.Id,
+                        Name = item.Key.Name,
                         Value = item.Value
                     };
             }
@@ -371,7 +515,7 @@ namespace UCollection
 
         #endregion
 
-        #region Helper Struct
+        #region /// Key Struct
         public struct KeyStruct : IEquatable<KeyStruct>
         {
             public TId Id { get; }
@@ -382,67 +526,29 @@ namespace UCollection
                 Id = id;
                 Name = name;
             }
-
-
-            //public bool Equals(KeyStruct other)
-            //{
-            //    bool result = false;
-            //    if (other is KeyStruct)
-            //    {
-
-            //    }
-
-            //     result = EqualityComparer<TId>.Default.Equals(Id, other.Id)
-            //                 && EqualityComparer<TName>.Default.Equals(Name, other.Name);
-
-
-            //    return result;
-            //}
-
-            //public override bool Equals(object other)
-            //{
-            //    return other is KeyStruct && Equals((KeyStruct)other);
-            //}
-
-            //public override int GetHashCode()
-            //{
-            //    var result = 17;
-            //    unchecked
-            //    {
-            //        //result = 31 * result + EqualityComparer<TId>.Default.GetHashCode(Id);
-            //        //result = 31 * result + EqualityComparer<TName>.Default.GetHashCode(Name);
-            //        //return result;
-            //        return Id.GetHashCode() ^ Name.GetHashCode();
-            //    }
-            //}
-
-            public bool Equals(KeyStruct other)
+            public KeyStruct(KeyStruct kStr)
             {
-                return EqualityComparer<TId>.Default.Equals(Id, other.Id) && EqualityComparer<TName>.Default.Equals(Name, other.Name);
+                Id = kStr.Id;
+                Name = kStr.Name;
             }
 
             public override bool Equals(object obj)
             {
-                if (ReferenceEquals(null, obj)) return false;
-                return obj is KeyStruct other && Equals(other);
+                return obj is KeyStruct && Equals((KeyStruct)obj);
+            }
+
+            public bool Equals(KeyStruct other)
+            {
+                return EqualityComparer<TId>.Default.Equals(Id, other.Id) &&
+                       EqualityComparer<TName>.Default.Equals(Name, other.Name);
             }
 
             public override int GetHashCode()
             {
-                unchecked
-                {
-                    return (EqualityComparer<TId>.Default.GetHashCode(Id) * 397) ^ EqualityComparer<TName>.Default.GetHashCode(Name);
-                }
-            }
-
-            public static bool operator ==(KeyStruct left, KeyStruct right)
-            {
-                return left.Equals(right);
-            }
-
-            public static bool operator !=(KeyStruct left, KeyStruct right)
-            {
-                return !left.Equals(right);
+                var hashCode = -1919740922;
+                hashCode = hashCode * -1521134295 + EqualityComparer<TId>.Default.GetHashCode(Id);
+                hashCode = hashCode * -1521134295 + EqualityComparer<TName>.Default.GetHashCode(Name);
+                return hashCode;
             }
         }
         #endregion

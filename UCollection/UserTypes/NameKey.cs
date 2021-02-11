@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace UCollection.UserTypes
 {
@@ -21,11 +17,7 @@ namespace UCollection.UserTypes
 
         public bool Equals(NameKey other)
         {
-            var idName = other as NameKey;
-
-            if (idName == null) return false;
-
-            return Name.Equals(idName.Name);
+            return other is NameKey idName && Name.Equals(idName.Name);
         }
 
         public override int GetHashCode()
